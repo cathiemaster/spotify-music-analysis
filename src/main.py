@@ -7,18 +7,19 @@ from concurrent.futures import process
 from datetime import datetime
 import os
 import spotipy
-import psycopg2 as pgs
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.oauth2 import SpotifyOauthError
 from spotipy.oauth2 import SpotifyClientCredentials
 from spotipy.oauth2 import SpotifyStateError
 from dotenv import load_dotenv
+import db
 
 URI = "http://localhost:8888"
 USER_READ_SCOPE = "user-read-recently-played playlist-read-private"
 CLIENT_ID = ""
 CLIENT_KEY = ""
 USERNAME = ""
+MAX_TRACKS = 500
 
 
 def configure():
@@ -98,6 +99,8 @@ def processRecentlyPlayed(tracks):
         album = getAlbum(t)
         name = getTrack(t)
 
+        #print(playedAt, id, artists, album, name)
+
         data.append({
             "datetime": playedAt,
             "id": id,
@@ -112,27 +115,36 @@ def processRecentlyPlayed(tracks):
 def getRecentlyPlayed(sp):
     data = []
     limit = 50
-    before = None
+    nextTimestamp = None
+    group = 1
 
+    print(f"Processing Group {group}...")
     res = sp.current_user_recently_played(limit=limit)
     data += processRecentlyPlayed(res["items"])
-    print(data)
 
-    # while res["next"]:
-    #     before = res["cursors"]["before"]
+    while (res["next"]) and (limit * group < MAX_TRACKS):
+        group += 1
+        nextTimestamp = res["cursors"]["before"]
+        print(f"Processing Group {group}...")
 
-    #     res = sp.current_user_recently_played(limit=limit)
-    #     data += processRecentlyPlayed(res["items"])
+        res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
+        data += processRecentlyPlayed(res["items"])
+
+    print(len(data))
+    return data
 
 
 def main():
     configure()
 
-    sp = getOAuth(USER_READ_SCOPE)
-    getRecentlyPlayed(sp)
-    # res = sp.current_user_recently_played()
+    db.connectToDB()
 
-    # print(res["next"], res["limit"], res["cursors"])
+    # sp = getOAuth(USER_READ_SCOPE)
+    # print("Getting recently played tracks...")
+    # data = getRecentlyPlayed(sp)
+
+    # for d in data:
+    #     print(d["datetime"])
 
 
 if __name__ == "__main__":
