@@ -7,6 +7,7 @@ from concurrent.futures import process
 from datetime import datetime
 import os
 import spotipy
+import spotipy.util as util
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.oauth2 import SpotifyOauthError
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -19,7 +20,7 @@ USER_READ_SCOPE = "user-read-recently-played playlist-read-private"
 CLIENT_ID = ""
 CLIENT_KEY = ""
 USERNAME = ""
-MAX_TRACKS = 500
+MAX_TRACKS = 50
 
 
 def configure():
@@ -34,13 +35,17 @@ def configure():
 def getOAuth(scope):
     auth = None
     try:
-        mgr = SpotifyOAuth(
-            client_id=CLIENT_ID, client_secret=CLIENT_KEY, redirect_uri=URI, scope=scope)
+        token = util.prompt_for_user_token(
+            username=USERNAME, client_id=CLIENT_ID, client_secret=CLIENT_KEY, redirect_uri=URI, scope=scope)
+        if token:
+            auth = spotipy.Spotify(auth=token)
+        # mgr = SpotifyOAuth(
+        #     client_id=CLIENT_ID, client_secret=CLIENT_KEY, redirect_uri=URI, scope=scope, open_browser=True)
 
-        auth = spotipy.Spotify(auth_manager=mgr)
+        # auth = spotipy.Spotify(auth_manager=mgr)
     except SpotifyOauthError:
         print("ERROR: Unable to authenticate user")
-        return(-1)
+        return auth
 
     return auth
 
@@ -53,7 +58,7 @@ def getClientAuth():
 
     except SpotifyStateError:
         print("ERROR: Unable to create Client Auth")
-        return(-1)
+        return (-1)
 
     return auth
 
@@ -89,27 +94,29 @@ def getArtistGenre(artistId):
     return artist["genres"]
 
 
+def getTrackData(track):
+    playedAt = track["played_at"]
+    id = getTrackId(track)
+    artists = getArtists(track)
+    album = getAlbum(track)
+    name = getTrack(track)
+
+    return (
+        id,
+        playedAt,
+        name,
+        artists,
+        album
+    )
+
+
 def processRecentlyPlayed(tracks):
-    data = []
-
     for t in tracks:
-        playedAt = t["played_at"]
-        id = getTrackId(t)
-        artists = getArtists(t)
-        album = getAlbum(t)
-        name = getTrack(t)
+        trackData = getTrackData(t)
+        print(trackData)
+        print()
 
-        #print(playedAt, id, artists, album, name)
-
-        data.append({
-            "datetime": playedAt,
-            "id": id,
-            "title": name,
-            "artists": artists,
-            "album": album,
-        })
-
-    return data
+    return []
 
 
 def getRecentlyPlayed(sp):
@@ -119,32 +126,32 @@ def getRecentlyPlayed(sp):
     group = 1
 
     print(f"Processing Group {group}...")
-    res = sp.current_user_recently_played(limit=limit)
-    data += processRecentlyPlayed(res["items"])
+    res = sp.current_user_recently_played()
+    processRecentlyPlayed(res["items"])
 
-    while (res["next"]) and (limit * group < MAX_TRACKS):
-        group += 1
-        nextTimestamp = res["cursors"]["before"]
-        print(f"Processing Group {group}...")
+    # while (res["next"]) and (limit * group < MAX_TRACKS):
+    #     group += 1
+    #     nextTimestamp = res["cursors"]["before"]
+    #     print(f"Processing Group {group}...")
 
-        res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
-        data += processRecentlyPlayed(res["items"])
+    #     res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
+    #     data += processRecentlyPlayed(res["items"])
 
-    print(len(data))
+    # print(len(data))
     return data
 
 
 def main():
     configure()
 
-    db.connectToDB()
+    # curr = db.connectToDB()
+    # db.getDBVersion(curr)
+    # db.closeDB(curr)
 
-    # sp = getOAuth(USER_READ_SCOPE)
-    # print("Getting recently played tracks...")
-    # data = getRecentlyPlayed(sp)
-
-    # for d in data:
-    #     print(d["datetime"])
+    sp = getOAuth(USER_READ_SCOPE)
+    if (sp is not None):
+        print("Getting recently played tracks...")
+        data = getRecentlyPlayed(sp)
 
 
 if __name__ == "__main__":

@@ -29,17 +29,39 @@ def connectToDB():
         params = config()
         conn = pgs.connect(**params)
 
-        cur = conn.cursor()
-        cur.execute("SELECT version()")
-        dbVersion = cur.fetchone()
-        print(f"PostgreSQL version: {dbVersion[0]}")
-
-        cur.close()
+        return conn.cursor()
 
     except (Exception, pgs.DatabaseError) as e:
         print(e)
+        return None
 
-    finally:
-        if conn:
-            conn.close()
-            print("Database connection closed.")
+
+def closeDB(curr):
+    if (curr):
+        curr.close()
+        print("Database connection closed.")
+
+
+def getDBVersion(curr):
+    curr.execute("SELECT version()")
+    dbVersion = curr.fetchone()
+
+    print(f"PostgreSQL version: {dbVersion[0]}")
+
+
+def insertTrack(curr, trackData):
+    print(trackData)
+
+    print("Inserting track...")
+
+
+def insertArtist():
+    print("Inserting artist...")
+
+
+def insertGenre():
+    print("Inserting genre...")
+
+
+def linkArtistToGenre():
+    print("linking artist and genre...")
