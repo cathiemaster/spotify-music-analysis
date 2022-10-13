@@ -55,11 +55,11 @@ def insertTrack(curr, trackData):
     print("Inserting track...")
 
 
-def insertArtist():
+def insertArtist(curr, artistData):
     print("Inserting artist...")
 
 
-def insertGenre():
+def insertGenre(curr, genreData):
     print("Inserting genre...")
 
 

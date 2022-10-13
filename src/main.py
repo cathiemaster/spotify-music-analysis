@@ -4,6 +4,7 @@
 # Genre Frequency
 
 from concurrent.futures import process
+from contextlib import nullcontext
 from datetime import datetime
 import os
 import spotipy
@@ -75,19 +76,26 @@ def getTrackId(data):
     return data["track"]["id"]
 
 
-def getArtists(data):
+def getArtistData(data):
     artistList = data["track"]["artists"]
-    artists = []
-    for a in artistList:
-        genres = getArtistGenre(a["id"])
-        artists.append(
-            {"name": a["name"],
-             "genres": genres})
 
-    return artists
+    if (len(artistList) > 0):
+        return (artistList[0]["name"], artistList[0]["id"])
+
+    return ("", "")
 
 
-def getArtistGenre(artistId):
+def getArtistTopGenre(artistId):
+    sp = getClientAuth()
+    artist = sp.artist(artistId)
+
+    if (len(artist["genres"]) > 0):
+        return artist["genres"][0]
+
+    return ""
+
+
+def getArtistAllGenres(artistId):
     sp = getClientAuth()
     artist = sp.artist(artistId)
 
@@ -96,62 +104,105 @@ def getArtistGenre(artistId):
 
 def getTrackData(track):
     playedAt = track["played_at"]
-    id = getTrackId(track)
-    artists = getArtists(track)
-    album = getAlbum(track)
+    trackId = getTrackId(track)
     name = getTrack(track)
+    album = getAlbum(track)
+    (artist, artistId) = getArtistData(track)
+    genre = getArtistTopGenre(artistId)
 
     return (
-        id,
+        trackId,
         playedAt,
         name,
-        artists,
-        album
+        album,
+        artist,
+        artistId,
+        album,
+        genre
     )
 
 
-def processRecentlyPlayed(tracks):
+def processArtistHistory(curr, track):
+    playedAt = track["played_at"]
+    trackId = getTrackId(track)
+
+    for artist in track["track"]["artists"]:
+        print(artist)
+        artistName = artist["name"]
+        artistId = artist["id"]
+
+        # Push to artist_history db
+        artistData = (
+            playedAt,
+            trackId,
+            artistName,
+            artistId
+        )
+
+        print(artistData)
+        db.insertArtist(curr, artistData)
+
+        # Push to genre_history db for all artist genres
+        processGenreHistory(curr, playedAt, trackId, artistId)
+
+
+def processGenreHistory(curr, playedAt, trackId, artistId):
+    artistGenres = getArtistAllGenres(artistId)
+
+    for genre in artistGenres:
+        genreData = (
+            playedAt,
+            trackId,
+            artistId,
+            genre
+        )
+        print(genreData)
+        db.insertGenre(curr, genreData)
+
+
+def processTrackHistory(curr, tracks):
     for t in tracks:
         trackData = getTrackData(t)
-        print(trackData)
-        print()
+        # print(trackData)
+        # print()
 
-    return []
+        # Push to track_history db
+        db.insertTrack(curr, trackData)
+
+        processArtistHistory(curr, t)
 
 
-def getRecentlyPlayed(sp):
-    data = []
+def getRecentlyPlayed(sp, curr):
     limit = 50
     nextTimestamp = None
     group = 1
 
     print(f"Processing Group {group}...")
+
     res = sp.current_user_recently_played()
-    processRecentlyPlayed(res["items"])
+    processTrackHistory(res["items"])
 
-    # while (res["next"]) and (limit * group < MAX_TRACKS):
-    #     group += 1
-    #     nextTimestamp = res["cursors"]["before"]
-    #     print(f"Processing Group {group}...")
+    while (res["next"]) and (limit * group < MAX_TRACKS):
+        group += 1
+        nextTimestamp = res["cursors"]["before"]
+        print(f"Processing Group {group}...")
 
-    #     res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
-    #     data += processRecentlyPlayed(res["items"])
-
-    # print(len(data))
-    return data
+        res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
+        processTrackHistory(res["items"])
 
 
 def main():
     configure()
 
-    # curr = db.connectToDB()
-    # db.getDBVersion(curr)
-    # db.closeDB(curr)
+    curr = db.connectToDB()
+    db.getDBVersion(curr)
 
     sp = getOAuth(USER_READ_SCOPE)
     if (sp is not None):
         print("Getting recently played tracks...")
-        data = getRecentlyPlayed(sp)
+        getRecentlyPlayed(sp)
+
+    db.closeDB(curr)
 
 
 if __name__ == "__main__":
