@@ -52,16 +52,60 @@ def getDBVersion(curr):
 def insertTrack(curr, trackData):
     print(trackData)
 
-    print("Inserting track...")
+    try:
+        print("Inserting track...")
+
+        insertQuery = """ INSERT INTO track_history 
+            (played_at, track_id, title, album, track_link, primary_artist, primary_genre) 
+            VALUES (%s,%s,%s,%s,%s,%s,%s) """
+
+        sampleData = ("2022-10-19 01:31:59",
+                      "35r28RDot7nPE7y9K9H7l0", "Feeling Whitney", "Stoney (Deluxe)", "https://api.spotify.com/v1/tracks/0y60itmpH0aPKsFiGxmtnh", "Post Malone", "dfw rap")
+
+        curr.execute(insertQuery, sampleData)
+        curr.commit()
+        count = curr.rowcount()
+
+        print(f"Committed {count} rows")
+    except (Exception, pgs.DatabaseError) as e:
+        print(e)
 
 
 def insertArtist(curr, artistData):
-    print("Inserting artist...")
+    try:
+        print("Inserting artist...")
+
+        insertQuery = """ INSERT INTO artist_history 
+            (played_at, artist_id, artist_name, track_id) 
+            VALUES (%s,%s,%s,%s) """
+
+        sampleData = ("2022-10-19 01:31:59",
+                      "246dkjvS1zLTtiykXe5h60", "Noah Cyrus", "6J2LdBN97cDWn0MLxYh9HB")
+
+        curr.execute(insertQuery, sampleData)
+        curr.commit()
+        count = curr.rowCount()
+
+        print(f"Committed {count} rows")
+    except (Exception, pgs.DatabaseError) as e:
+        print(e)
 
 
 def insertGenre(curr, genreData):
-    print("Inserting genre...")
+    try:
+        print("Inserting genre...")
 
+        insertQuery = """ INSERT INTO genre_history 
+            (played_at, genre_name, track_id, artist_id)
+            VALUES (%s,%s,%s,%s) """
 
-def linkArtistToGenre():
-    print("linking artist and genre...")
+        sampleData = ("2022-10-19 01:31:59", "pop",
+                      "6J2LdBN97cDWn0MLxYh9HB", "246dkjvS1zLTtiykXe5h60")
+
+        curr.execute(insertQuery, sampleData)
+        curr.commit()
+        count = curr.rowCount()
+
+        print(f"Committed {count} rows")
+    except (Exception, pgs.DatabaseError) as e:
+        print(e)

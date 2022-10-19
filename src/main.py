@@ -1,8 +1,3 @@
-# Analytics:
-# Top 25 Artists
-# Top 3 Genres
-# Genre Frequency
-
 from concurrent.futures import process
 from contextlib import nullcontext
 from datetime import datetime
@@ -64,8 +59,20 @@ def getClientAuth():
     return auth
 
 
+def getDateTime(dt):
+    vals = dt.split("T")
+    date = vals[0]
+    time = ((vals[1].split("T"))[0]).split(".")[0]
+
+    return date + " " + time
+
+
 def getAlbum(data):
     return data["track"]["album"]["name"]
+
+
+def getTrackLink(data):
+    return data["track"]["href"]
 
 
 def getTrack(data):
@@ -103,31 +110,32 @@ def getArtistAllGenres(artistId):
 
 
 def getTrackData(track):
-    playedAt = track["played_at"]
+
+    playedAt = getDateTime(track["played_at"])
     trackId = getTrackId(track)
-    name = getTrack(track)
+    title = getTrack(track)
     album = getAlbum(track)
+    trackLink = getTrackLink(track)
     (artist, artistId) = getArtistData(track)
     genre = getArtistTopGenre(artistId)
 
     return (
-        trackId,
         playedAt,
-        name,
+        trackId,
+        title,
         album,
+        trackLink,
         artist,
-        artistId,
         album,
         genre
     )
 
 
 def processArtistHistory(curr, track):
-    playedAt = track["played_at"]
+    playedAt = getDateTime(track["played_at"])
     trackId = getTrackId(track)
 
     for artist in track["track"]["artists"]:
-        print(artist)
         artistName = artist["name"]
         artistId = artist["id"]
 
@@ -139,7 +147,7 @@ def processArtistHistory(curr, track):
             artistId
         )
 
-        print(artistData)
+        # print(artistData)
         db.insertArtist(curr, artistData)
 
         # Push to genre_history db for all artist genres
@@ -156,18 +164,16 @@ def processGenreHistory(curr, playedAt, trackId, artistId):
             artistId,
             genre
         )
-        print(genreData)
+        # print(genreData)
         db.insertGenre(curr, genreData)
 
 
 def processTrackHistory(curr, tracks):
     for t in tracks:
         trackData = getTrackData(t)
-        # print(trackData)
-        # print()
 
         # Push to track_history db
-        db.insertTrack(curr, trackData)
+        #db.insertTrack(curr, trackData)
 
         processArtistHistory(curr, t)
 
@@ -180,7 +186,7 @@ def getRecentlyPlayed(sp, curr):
     print(f"Processing Group {group}...")
 
     res = sp.current_user_recently_played()
-    processTrackHistory(res["items"])
+    processTrackHistory(curr, res["items"])
 
     while (res["next"]) and (limit * group < MAX_TRACKS):
         group += 1
@@ -188,7 +194,7 @@ def getRecentlyPlayed(sp, curr):
         print(f"Processing Group {group}...")
 
         res = sp.current_user_recently_played(limit=limit, after=nextTimestamp)
-        processTrackHistory(res["items"])
+        processTrackHistory(curr, res["items"])
 
 
 def main():
@@ -198,9 +204,13 @@ def main():
     db.getDBVersion(curr)
 
     sp = getOAuth(USER_READ_SCOPE)
-    if (sp is not None):
-        print("Getting recently played tracks...")
-        getRecentlyPlayed(sp)
+
+    db.insertTrack(curr, ())
+    db.insertArtist(curr, ())
+    db.insertGenre(curr, ())
+    # if (sp is not None):
+    #     print("Getting recently played tracks...")
+    #     getRecentlyPlayed(sp, curr)
 
     db.closeDB(curr)
 

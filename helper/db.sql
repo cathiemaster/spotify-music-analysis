@@ -40,7 +40,8 @@ Create table IF NOT EXISTS genre_history (
     played_at timestamp not null,
     genre_name varchar(255) not null,
     track_id integer not null,
-    primary key (played_at, track_id)
+    artist_id integer not null,
+    primary key (played_at, artist_id)
 );
 
 /* alter table genres add constraint fk_track_id foreign key (track_id) references tracks(track_id); */
